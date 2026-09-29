@@ -1,13 +1,13 @@
 # 私有服务器部署（Tailscale + systemd）
 
-适用场景：已有 Linux 云服务器，仅供自己的手机和电脑访问；没有自有域名，不希望自行维护 TLS 证书；每台终端在 SocialCoach 设置页配置自己的模型凭证。
+适用场景：已有 Linux 云服务器，仅供自己的手机和电脑访问；没有自有域名，不希望自行维护 TLS 证书。模型可由私有服务器统一调用，也可由每台终端自带凭证。
 
 ## 边界
 
 - 使用 **Tailscale Serve**，不使用 Funnel。Serve 只对同一 Tailnet 内的设备开放；Funnel 会把服务公开到互联网。
 - 不需要自有域名或手工管理证书。Tailscale Serve 为 `*.ts.net` 地址终止 HTTPS。
 - 应用只监听 `127.0.0.1`；云平台安全组不开放应用端口。
-- 强制 BYOK，服务器不保存模型 API key。练习档案仍保存在各设备浏览器中，不在设备间同步。
+- 模型凭证二选一：仅个人使用时可由服务器统一保管；多用户或要求每台设备独立计费时强制 BYOK。练习档案始终保存在各设备浏览器中，不在设备间同步。
 
 ## 应用运行方式
 
@@ -50,29 +50,42 @@ sudo systemctl enable --now socialcoach.service
 
 ## 生产环境变量
 
-`/opt/socialcoach/.env.production` 放在构建上下文之外，不进 Git：
+`/opt/socialcoach/.env.production` 放在构建上下文之外，不进 Git。单用户私有部署优先使用服务器凭证，手机只请求同源的 SocialCoach API，不受模型供应商 CORS 限制：
 
 ```dotenv
 NODE_ENV=production
 HOSTNAME=127.0.0.1
 PORT=9090
 
+LLM_PROVIDER=openai
+LLM_BASE_URL=https://provider.example/v1
+LLM_API_KEY=<server-only-secret>
+LLM_FAST_MODEL=<model-id>
+LLM_SMART_MODEL=<model-id>
+LLM_REQUIRE_BYOK=false
+```
+
+需要每台设备使用自己的凭证时，改为：
+
+```dotenv
 LLM_API_KEY=
 LLM_REQUIRE_BYOK=true
 ```
 
-其他模型默认值可以保留，用于终端设置页的初始提示。开启 `LLM_REQUIRE_BYOK=true` 时，`LLM_API_KEY` 必须留空。修改后重启并检查：
+BYOK 在浏览器中直接请求模型端点，因此自定义端点必须支持 HTTPS 和 CORS；不满足时应使用服务器凭证，或单独实现不落盘的 BYOK 服务端转发。修改后重启并检查：
 
 ```bash
 sudo systemctl restart socialcoach.service
 curl -fsS http://127.0.0.1:9090/api/health
 ```
 
-期望返回：
+服务器凭证模式期望返回：
 
 ```json
-{"serverKey":false,"requireByok":true}
+{"serverKey":true,"requireByok":false}
 ```
+
+BYOK 模式则期望返回 `{"serverKey":false,"requireByok":true}`。
 
 ## Tailscale Serve
 

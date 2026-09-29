@@ -124,7 +124,7 @@ For OpenAI-compatible endpoints that require `max_completion_tokens`, set `LLM_O
 | **Docker Compose** | Use [`app/compose.yaml`](app/compose.yaml) for a single app instance with Caddy and automatic HTTPS. |
 | **Vercel** | Set the project root to `app` and configure the model variables above. Check your deployment's function duration limits for longer debrief requests. |
 | **[ModelScope](https://modelscope.cn/studios/GeminiLight/SocialCoach)** | Use the repository-root [`Dockerfile`](Dockerfile), which serves on port 7860. Configure credentials through Studio Secrets. See the [deployment guide](wiki/specs/spec-modelscope-deployment.md). |
-| **Private server + Tailscale** | Run the standalone build with systemd, require BYOK, and expose it only to your Tailnet with automatic HTTPS. No domain is required. See the [private deployment guide](wiki/82-private-server-deployment.md). |
+| **Private server + Tailscale** | Run the standalone build with systemd and expose it only to your Tailnet with automatic HTTPS. Use a server credential or BYOK; no domain is required. See the [private deployment guide](wiki/82-private-server-deployment.md). |
 
 <details>
 <summary><strong>Docker Compose setup and operating notes</strong></summary>
