@@ -197,6 +197,8 @@ type ChatRole = "learner" | "npc" | "coach" | "event";   // event = 房间里发
 | `ANTHROPIC_BASE_URL` | 自定义网关 / 代理 | 空 = `api.anthropic.com` |
 | `LLM_FAST_MODEL` | 对话 / 提示 / 排程 / 生成场景 | `claude-sonnet-5` |
 | `LLM_SMART_MODEL` | 复盘报告 | `claude-opus-5` |
+| `LLM_SMART_PROVIDER` / `LLM_SMART_BASE_URL` | 让 smart 模型走另一套协议（网关只在 `/v1/messages` 提供 Claude 时用） | 空 = 跟随 `LLM_PROVIDER` |
+| `LLM_OPENAI_THINKING` | OpenAI 兼容网关关闭思考的方式：`disabled`（GLM 式）/ `none`（DeepSeek 式 `reasoning_effort`） | 空 = 不发 |
 
 客户端 `Anthropic` 实例是单例，`maxRetries: 2`，`timeout: 120_000`（`src/lib/llm.ts`）。
 

@@ -9,6 +9,7 @@ import {
   type ChatOpts,
   type JSONCallOpts,
   type LLM,
+  type OpenAIThinkingMode,
   type Provider,
   type SystemPart,
   type TextRun,
@@ -29,6 +30,12 @@ export type { ChatOpts, LLM, Provider, SystemPart, TextRun };
  *                   OpenRouter, LiteLLM, …)
  *   LLM_API_KEY     credential; provider-native vars still work as fallbacks
  *   LLM_FAST_MODEL / LLM_SMART_MODEL
+ *   LLM_SMART_PROVIDER / LLM_SMART_BASE_URL
+ *                   run the smart model on the other protocol (e.g. Claude
+ *                   behind a chat-completions gateway that also serves it
+ *                   only via /v1/messages)
+ *   LLM_OPENAI_THINKING  off | none — how to disable reasoning on gateways
+ *                   that would otherwise burn max_tokens on hidden thinking
  * ------------------------------------------------------------------------- */
 
 const raw = (process.env.LLM_PROVIDER ?? "anthropic").trim().toLowerCase();
@@ -37,6 +44,30 @@ export const PROVIDER: Provider = raw === "openai" ? "openai" : "anthropic";
 const BASE_URL =
   process.env.LLM_BASE_URL ||
   (PROVIDER === "openai" ? process.env.OPENAI_BASE_URL : process.env.ANTHROPIC_BASE_URL) ||
+  undefined;
+
+/**
+ * The smart model can run on a different protocol than the fast model: some
+ * gateways expose Claude only over the native Messages API while everything
+ * else speaks chat completions (and each side may have its own models).
+ * Unset → the smart model follows LLM_PROVIDER like always.
+ *
+ *   LLM_SMART_PROVIDER  anthropic | openai
+ *   LLM_SMART_BASE_URL  endpoint for that provider; defaults to the
+ *                       provider-native var, else LLM_BASE_URL with a
+ *                       trailing /v1 stripped (the Anthropic SDK appends
+ *                       its own /v1/messages, so it must not already have one)
+ */
+const SMART_PROVIDER: Provider | undefined = (() => {
+  const raw = (process.env.LLM_SMART_PROVIDER ?? "").trim().toLowerCase();
+  if (raw !== "anthropic" && raw !== "openai") return undefined;
+  return raw === PROVIDER ? undefined : (raw as Provider);
+})();
+
+const SMART_BASE_URL =
+  process.env.LLM_SMART_BASE_URL ||
+  (SMART_PROVIDER === "openai" ? process.env.OPENAI_BASE_URL : process.env.ANTHROPIC_BASE_URL) ||
+  BASE_URL?.replace(/\/v1\/?$/, "") ||
   undefined;
 
 const API_KEY =
@@ -52,8 +83,11 @@ const API_KEY =
  */
 const OPENAI_TOKEN_PARAM: TokenParam = process.env.LLM_OPENAI_TOKEN_PARAM === "max_completion_tokens" ? "max_completion_tokens" : "max_tokens";
 
-/** Some OpenAI-compatible reasoning models accept `thinking:{type:"disabled"}`; official OpenAI 400s on it. */
-const OPENAI_DISABLE_THINKING = process.env.LLM_OPENAI_THINKING === "disabled";
+/** How the OpenAI-compatible path should turn thinking off. GLM-style gateways
+ *  take `thinking:{type:"disabled"}`; DeepSeek-style ones want
+ *  `reasoning_effort:"none"`. Official OpenAI rejects both — leave unset there. */
+const OPENAI_THINKING_MODE: OpenAIThinkingMode | undefined =
+  process.env.LLM_OPENAI_THINKING === "disabled" ? "off" : process.env.LLM_OPENAI_THINKING === "none" ? "none" : undefined;
 
 const DEFAULT_MODELS: Record<Provider, { fast: string; smart: string }> = {
   anthropic: { fast: "claude-sonnet-5", smart: "claude-opus-5" },
@@ -68,6 +102,8 @@ export const SMART_MODEL = process.env.LLM_SMART_MODEL ?? DEFAULT_MODELS[PROVIDE
 
 let _anthropic: Anthropic | null = null;
 let _openai: OpenAI | null = null;
+let _smartAnthropic: Anthropic | null = null;
+let _smartOpenai: OpenAI | null = null;
 
 /** Whether this deployment can call a model on the learner's behalf. */
 export const hasServerCredential = () => !!API_KEY;
@@ -92,6 +128,28 @@ function openai(): OpenAI {
   return _openai;
 }
 
+function smartAnthropic(): Anthropic {
+  if (!_smartAnthropic) _smartAnthropic = new Anthropic({ apiKey: requireKey(), baseURL: SMART_BASE_URL, maxRetries: 2, timeout: 120_000 });
+  return _smartAnthropic;
+}
+
+function smartOpenai(): OpenAI {
+  if (!_smartOpenai) _smartOpenai = new OpenAI({ apiKey: requireKey(), baseURL: SMART_BASE_URL, maxRetries: 2, timeout: 120_000 });
+  return _smartOpenai;
+}
+
+/**
+ * Which protocol a call should use. Tasks name their model explicitly, so the
+ * choice is per call: the smart model goes to its own provider when one is
+ * configured. A split only makes sense while the two models differ — with
+ * FAST_MODEL === SMART_MODEL there is nothing to separate, so we keep one
+ * provider and ignore LLM_SMART_PROVIDER.
+ */
+function route(o: ChatOpts): Provider {
+  if (SMART_PROVIDER && FAST_MODEL !== SMART_MODEL && o.model === SMART_MODEL) return SMART_PROVIDER;
+  return PROVIDER;
+}
+
 /* ───────────────────────────── The server LLM ─────────────────────────────
  * Built from environment variables. The browser builds its own from the user's
  * settings (see `llm-client.ts`); both satisfy the same `LLM` interface, so the
@@ -100,15 +158,17 @@ function openai(): OpenAI {
 
 /** One-shot call; returns the assistant's text. */
 export async function chatText(o: ChatOpts): Promise<string> {
-  if (PROVIDER === "openai") {
-    const res = await openai().chat.completions.create(
-      openaiArgs(o, SMART_MODEL, OPENAI_TOKEN_PARAM, OPENAI_DISABLE_THINKING) as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+  if (route(o) === "openai") {
+    const client = o.model === SMART_MODEL && SMART_PROVIDER === "openai" ? smartOpenai() : openai();
+    const res = await client.chat.completions.create(
+      openaiArgs(o, SMART_MODEL, OPENAI_TOKEN_PARAM, OPENAI_THINKING_MODE) as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
     );
     const choice = res.choices[0];
     if (choice?.message?.refusal) throw new LLMError("The model declined this request.", 422);
     return choice?.message?.content ?? "";
   }
-  const res = await anthropic().messages.create(anthropicArgs(o, SMART_MODEL));
+  const client = o.model === SMART_MODEL && SMART_PROVIDER === "anthropic" ? smartAnthropic() : anthropic();
+  const res = await client.messages.create(anthropicArgs(o, SMART_MODEL));
   if (res.stop_reason === "refusal") throw new LLMError("The model declined this request.", 422);
   return res.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -121,9 +181,10 @@ export function chatStream(o: ChatOpts): TextRun {
   let acc = "";
   let refusal = false;
   async function* run() {
-    if (PROVIDER === "openai") {
-      const stream = await openai().chat.completions.create({
-        ...openaiArgs(o, SMART_MODEL, OPENAI_TOKEN_PARAM, OPENAI_DISABLE_THINKING),
+    if (route(o) === "openai") {
+      const client = o.model === SMART_MODEL && SMART_PROVIDER === "openai" ? smartOpenai() : openai();
+      const stream = await client.chat.completions.create({
+        ...openaiArgs(o, SMART_MODEL, OPENAI_TOKEN_PARAM, OPENAI_THINKING_MODE),
         stream: true,
       } as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming);
       for await (const chunk of stream) {
@@ -138,7 +199,8 @@ export function chatStream(o: ChatOpts): TextRun {
       }
       return;
     }
-    const stream = anthropic().messages.stream(anthropicArgs(o, SMART_MODEL));
+    const client = o.model === SMART_MODEL && SMART_PROVIDER === "anthropic" ? smartAnthropic() : anthropic();
+    const stream = client.messages.stream(anthropicArgs(o, SMART_MODEL));
     for await (const ev of stream) {
       if (ev.type === "content_block_delta" && ev.delta.type === "text_delta" && ev.delta.text) {
         acc += ev.delta.text;

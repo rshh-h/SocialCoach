@@ -70,19 +70,26 @@ export function anthropicArgs(o: ChatOpts, fallbackModel: string) {
 }
 
 /**
- * Request body for OpenAI chat completions, and for anything speaking the same
+ * How a gateway wants thinking turned off — endpoints disagree:
+ * GLM accepts `thinking:{type:"disabled"}`, DeepSeek wants
+ * `reasoning_effort:"none"`, official OpenAI rejects both fields.
+ */
+export type OpenAIThinkingMode = "off" | "none";
+
+/** Request body for OpenAI chat completions, and for anything speaking the same
  * protocol. Prompt caching is automatic there so the `cache` hint is dropped,
  * and system parts are joined into one system message.
  */
-export function openaiArgs(o: ChatOpts, fallbackModel: string, tokenParam: TokenParam, disableThinking = false) {
+
+export function openaiArgs(o: ChatOpts, fallbackModel: string, tokenParam: TokenParam, thinkingMode?: OpenAIThinkingMode) {
   return {
     model: o.model ?? fallbackModel,
     [tokenParam]: o.maxTokens,
     // Reasoning models spend `max_tokens` on thinking before they write a word,
-    // so a short budget can come back empty. Endpoints differ on how to turn it
-    // off — GLM takes `thinking`, official OpenAI rejects the field outright —
-    // hence the opt-in.
-    ...(disableThinking && o.thinking === false ? { thinking: { type: "disabled" as const } } : {}),
+    // so a short budget can come back empty. Hence the opt-in via
+    // `LLM_OPENAI_THINKING` and only for tasks that asked for no thinking.
+    ...(thinkingMode === "off" && o.thinking === false ? { thinking: { type: "disabled" as const } } : {}),
+    ...(thinkingMode === "none" && o.thinking === false && !o.effort ? { reasoning_effort: "none" as const } : {}),
     messages: [
       { role: "system" as const, content: systemParts(o.system).map((p) => p.text).join("\n\n") },
       ...o.messages.map((m) => ({ role: m.role, content: m.content })),

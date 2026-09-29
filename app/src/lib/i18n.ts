@@ -214,6 +214,7 @@ const dict = {
   pr_voice: { zh: "语音输入", en: "Voice input" },
   pr_listening: { zh: "正在听…", en: "Listening…" },
   pr_error: { zh: "对话中断了。", en: "The conversation was interrupted." },
+  pr_empty_reply: { zh: "对方没有说出回复，请重试。", en: "The other person gave no reply. Please try again." },
   pr_scene_over: { zh: "场景已结束", en: "Scene over" },
   pr_engine_note: { zh: "旁白", en: "Aside" },
 
