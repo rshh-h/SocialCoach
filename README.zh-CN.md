@@ -120,6 +120,7 @@ pnpm dev
 | **Docker Compose** | 使用 [`app/compose.yaml`](app/compose.yaml)，包含单实例应用、Caddy 反向代理和自动 HTTPS。 |
 | **Vercel** | 项目根目录设为 `app`，配置上面的模型变量，并检查当前部署的函数时长限制是否支持较长的复盘请求。 |
 | **[ModelScope 创空间](https://modelscope.cn/studios/GeminiLight/SocialCoach)** | 使用仓库根目录的 [`Dockerfile`](Dockerfile)，服务端口为 7860，通过创空间 Secrets 配置凭证。详见[部署记录](wiki/specs/spec-modelscope-deployment.md)。 |
+| **私有服务器 + Tailscale** | 用 systemd 运行 standalone，强制 BYOK，只对自己的 Tailnet 开放自动 HTTPS，不需要自有域名。详见[私有部署指南](wiki/82-private-server-deployment.md)。 |
 
 <details>
 <summary><strong>Docker Compose 操作步骤与运行说明</strong></summary>

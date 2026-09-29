@@ -108,6 +108,12 @@
 - **解决方案：** ModelScope 专用根目录 Dockerfile 创建用户时加 `-s /bin/sh`，继续使用非 root 用户运行应用。
 - **教训：** 云平台可能包装容器启动命令；镜像构建通过后仍需查看运行日志，确认进程实际监听目标端口。
 
+### 国内服务器上 Docker 内构建会被网络掐死（2026-09-29）
+- **现象：** 腾讯云 Ubuntu 24.04 上 `docker build` 三连败：`node:22-alpine` 拉取 i/o timeout；配 `mirror.ccs.tencentyun.com` 后 `pnpm install` 在 367/368 处 `The operation was aborted due to timeout`，且 pnpm 11 拒绝 `--fetch-timeout` 等 CLI 旗标（Unknown options），ENV `npm_config_fetch_*` 也压不住同一处超时。同一台机器宿主机直接 `pnpm install`（同 registry 同配置）14.4 秒完成。
+- **原因：** Docker Hub 与 npmjs 在国内机器上不稳是表象；legacy builder 容器内的网络路径把偶发超时放大成必然失败。pnpm 11 移除了 fetch 类 CLI 旗标，容器链路里 ENV 兜底也没生效。
+- **解决方案：** 放弃容器内构建：宿主机装 Node 22 与 pnpm（二进制与 corepack 都走 `registry.npmmirror.com/-/binary/` 与 `COREPACK_NPM_REGISTRY`），`pnpm build` 出 standalone，systemd 直跑 `node server.js`（`PORT`/`HOSTNAME` 环境变量，`EnvironmentFile` 注入密钥，env 文件放在构建上下文外）。限流计数器本就在内存、要求单实例，systemd 单进程等价满足。
+- **教训：** 国内服务器部署先试宿主机构建再试容器构建；依赖与二进制统一走 npmmirror。Docker 内构建失败不代表宿主机构建会失败，排查时先分清是网络问题还是构建器问题。
+
 ### `after()` 里的工作计入 Vercel 函数时长
 - **现象：** `/api/track` 第二批上线后，生产第一条 POST 记了 `Vercel Runtime Timeout Error: Task timed out after 30 seconds`，那批事件丢了。
 - **原因：** 落点第一次写旧表前要补 12 列，加上列表和写入是 14 次串行跨境飞书调用，全在 `after()` 里跑；`after()` 不是 fire-and-forget，它占用函数的 `maxDuration`，而路由写的是 30 秒。
