@@ -4,6 +4,7 @@ node_modules/
 .env.local
 .env.*.local
 *.log
+/mac.pem
 
 # Local launch planning and unpublished marketing drafts
 marketing/
