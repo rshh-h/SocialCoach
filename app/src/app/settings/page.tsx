@@ -225,7 +225,7 @@ export default function Settings() {
             </p>
             <div className="card divide-y divide-line">
               <Row label={t(lang, "st_telemetry")} hint={t(lang, "st_telemetry_hint")}>
-                <Switch checked={settings.telemetry !== false} onChange={(v) => setSettings({ telemetry: v })} label={t(lang, "st_telemetry")} />
+                <Switch checked={settings.telemetry === true} onChange={(v) => setSettings({ telemetry: v })} label={t(lang, "st_telemetry")} />
               </Row>
               <button
                 onClick={exportData}

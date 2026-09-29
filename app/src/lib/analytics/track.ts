@@ -26,7 +26,8 @@ let available: boolean | null = null;
 let probing: Promise<boolean> | undefined;
 let listening = false;
 
-const enabled = () => useApp.getState().settings.telemetry !== false;
+// Opt-in: undefined means off, so nothing is sent until the learner turns this on.
+const enabled = () => useApp.getState().settings.telemetry === true;
 
 function deviceId(): string | null {
   try {

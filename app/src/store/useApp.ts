@@ -33,8 +33,9 @@ export interface Settings {
   patience?: Patience;
   /**
    * Anonymous usage events (which scenario, how long, how it ended; never
-   * what was said) to the team's table. Undefined means on; the switch in
-   * Settings is the way out, and About says what leaves the device.
+   * what was said) to the team's table. Off by default — undefined means
+   * off, and the switch in Settings is the way in. About says what leaves
+   * the device.
    */
   telemetry?: boolean;
 }
