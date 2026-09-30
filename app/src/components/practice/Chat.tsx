@@ -207,10 +207,6 @@ export function Chat({ session }: { session: Session }) {
         );
         const parsed = parseRoleplay(full, npcIds);
         if (parsed.error) throw new Error(parsed.error);
-        // A reasoning model can exhaust its budget on hidden thinking and end
-        // with an empty or meta-only response. Treat that as a failed turn so
-        // the spinner becomes an actionable retry instead of silently vanishing.
-        if (parsed.utterances.length === 0) throw new Error(t(lang, "pr_empty_reply"));
         parsed.utterances.forEach((u, i) => {
           if (!ids[i]) ids[i] = uid();
           updateLastNpc(session.id, u.text, u.characterId, ids[i]);

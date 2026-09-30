@@ -99,7 +99,6 @@ Edit `.env.local` before starting:
 | `LLM_BASE_URL` | Your gateway's endpoint, or leave empty for the provider default |
 | `LLM_FAST_MODEL` | A model ID available from your provider, for conversations and short coaching tasks |
 | `LLM_SMART_MODEL` | A model ID available from your provider, for debriefs; this can be the same model |
-| `LLM_SMART_PROVIDER` | Optional. Run the smart model on the other protocol (`anthropic`/`openai`) when a gateway serves it only there |
 
 ```bash
 pnpm dev

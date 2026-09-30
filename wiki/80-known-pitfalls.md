@@ -14,12 +14,6 @@
 
 ## API 集成
 
-### OpenAI 兼容网关不一定透传模型原生的 `thinking` 参数
-- **现象：** 本地使用 PackyAPI 的 `glm-5.3-flash` 时，角色回复首字节约 55 秒；照搬智谱直连部署的 `LLM_OPENAI_THINKING=disabled` 后，网关立即返回 MaaS 请求格式错误。
-- **原因：** 模型名称相同不代表兼容层能力相同。智谱端点接受 `thinking: { type: "disabled" }`，PackyAPI 的 OpenAI 兼容路由不接受该字段；未关闭思考时，隐藏推理又会显著拖慢短对话。
-- **解决方案：** `LLM_OPENAI_THINKING` 只在端点明确支持时启用，且各网关接受的字段不同：GLM 式认 `disabled`（发 `thinking:{type:"disabled"}`），DeepSeek 式认 `none`（发 `reasoning_effort:"none"`，实测 deepseek-v4-flash 关思考后回合 2s）。PackyAPI 上的 Claude 只在 `/v1/messages` 提供，用 `LLM_SMART_PROVIDER=anthropic` 让 smart 模型单独走 Anthropic 原生协议；同时客户端把空白或仅含 meta 的角色回复视为失败并提供重试，不再静默结束等待状态。
-- **教训：** 兼容 OpenAI 的只是基础请求形状，不是所有扩展字段。更换端点时用最小请求验证模型名、扩展参数和真实任务延迟三件事；不能从模型品牌推断网关能力。
-
 ### 网关不支持 `output_config.format`
 - **现象：** 用 SDK 的结构化输出 / JSON mode 会失败。
 - **原因：** 在用的网关不支持该参数（`src/lib/llm.ts` 有注释记录）。
