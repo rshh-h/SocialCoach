@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Engineering"
+  short_description: "从目标到交付，设计或审计工程体系"
+  default_prompt: "使用 $project-engineering 从目标、边界、阶段、架构和验收开始设计这个工程。"
