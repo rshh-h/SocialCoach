@@ -99,6 +99,7 @@ Edit `.env.local` before starting:
 | `LLM_BASE_URL` | Your gateway's endpoint, or leave empty for the provider default |
 | `LLM_FAST_MODEL` | A model ID available from your provider, for conversations and short coaching tasks |
 | `LLM_SMART_MODEL` | A model ID available from your provider, for debriefs; this can be the same model |
+| `LLM_FAST_MODEL_THINKING` | Optional `enabled` / `disabled` fast-model thinking policy; `disabled` requires endpoint support |
 
 ```bash
 pnpm dev

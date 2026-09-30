@@ -95,6 +95,7 @@ cp .env.example .env.local
 | `LLM_BASE_URL` | 网关地址；使用供应商默认地址时留空 |
 | `LLM_FAST_MODEL` | 供应商提供的模型 ID，用于对话和简短教练任务 |
 | `LLM_SMART_MODEL` | 供应商提供的模型 ID，用于复盘；可以与上一项相同 |
+| `LLM_FAST_MODEL_THINKING` | 可选：`enabled` / `disabled`；设为 `disabled` 前需确认端点支持该字段 |
 
 ```bash
 pnpm dev

@@ -12,6 +12,7 @@ export async function runRehearse(input: RehearseInput, llm: LLM, fastModel: str
 
   const raw = await jsonCall<Omit<Scenario, "id" | "source" | "custom">>({
     model: fastModel,
+    tier: "fast",
     thinking: false,
     maxTokens: 6000,
     system: rehearseSystem(lang),

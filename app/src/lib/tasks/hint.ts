@@ -9,6 +9,7 @@ export async function runHint(input: TurnInput, llm: LLM, fastModel: string): Pr
   const hint = (
     await llm.chatText({
       model: fastModel,
+      tier: "fast",
       maxTokens: 800,
       thinking: false,
       system: hintSystem(scenario, learnerCharacterId, lang),

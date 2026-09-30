@@ -62,6 +62,8 @@ LLM_BASE_URL=https://provider.example/v1
 LLM_API_KEY=<server-only-secret>
 LLM_FAST_MODEL=<model-id>
 LLM_SMART_MODEL=<model-id>
+# 端点支持 thinking 字段时可设为 disabled；设 enabled 则使用端点默认思考模式
+LLM_FAST_MODEL_THINKING=disabled
 LLM_REQUIRE_BYOK=false
 ```
 

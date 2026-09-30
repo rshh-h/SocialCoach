@@ -7,6 +7,7 @@ export async function runReflect(input: ReflectInput, llm: LLM, fastModel: strin
   const { scenario, question, answer, lang, summary } = input;
   const run = llm.chatStream({
     model: fastModel,
+    tier: "fast",
     maxTokens: 1200,
     thinking: false,
     system: reflectSystem(scenario, lang),

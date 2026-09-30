@@ -78,6 +78,7 @@ export async function runAssess(input: AssessInput, llm: LLM, smartModel: string
 
   const run = llm.chatStream({
     model: smartModel,
+    tier: "smart",
     maxTokens: 8000,
     effort: "medium",
     system: [{ text: assessSystem(scenario, learnerCharacterId, lang, kb.theories, kb.cases, goals), cache: true }],

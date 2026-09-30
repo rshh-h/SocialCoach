@@ -27,6 +27,7 @@ export async function runSchedule(input: ScheduleInput, llm: LLM, fastModel: str
     prescription = await jsonCall<Prescription>(
       {
         model: fastModel,
+        tier: "fast",
         thinking: false,
         maxTokens: 2500,
         system: prescriptionSystem(lang),
@@ -76,6 +77,7 @@ export async function runSchedule(input: ScheduleInput, llm: LLM, fastModel: str
   const adaptation = await jsonCall<Adaptation>(
     {
       model: fastModel,
+      tier: "fast",
       thinking: false,
       maxTokens: 3000,
       system: adaptationSystem(lang),

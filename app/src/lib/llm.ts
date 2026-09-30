@@ -29,6 +29,7 @@ export type { ChatOpts, LLM, Provider, SystemPart, TextRun };
  *                   OpenRouter, LiteLLM, …)
  *   LLM_API_KEY     credential; provider-native vars still work as fallbacks
  *   LLM_FAST_MODEL / LLM_SMART_MODEL
+ *   LLM_FAST_MODEL_THINKING enabled | disabled; unset preserves task defaults
  * ------------------------------------------------------------------------- */
 
 const raw = (process.env.LLM_PROVIDER ?? "anthropic").trim().toLowerCase();
@@ -52,9 +53,6 @@ const API_KEY =
  */
 const OPENAI_TOKEN_PARAM: TokenParam = process.env.LLM_OPENAI_TOKEN_PARAM === "max_completion_tokens" ? "max_completion_tokens" : "max_tokens";
 
-/** Some OpenAI-compatible reasoning models accept `thinking:{type:"disabled"}`; official OpenAI 400s on it. */
-const OPENAI_DISABLE_THINKING = process.env.LLM_OPENAI_THINKING === "disabled";
-
 const DEFAULT_MODELS: Record<Provider, { fast: string; smart: string }> = {
   anthropic: { fast: "claude-sonnet-5", smart: "claude-opus-5" },
   // Set these explicitly for OpenAI-compatible endpoints; the defaults are only a guess.
@@ -65,6 +63,27 @@ const DEFAULT_MODELS: Record<Provider, { fast: string; smart: string }> = {
 export const FAST_MODEL = process.env.LLM_FAST_MODEL ?? DEFAULT_MODELS[PROVIDER].fast;
 /** Smart model: post-practice assessment reports. */
 export const SMART_MODEL = process.env.LLM_SMART_MODEL ?? DEFAULT_MODELS[PROVIDER].smart;
+
+const fastThinkingRaw = process.env.LLM_FAST_MODEL_THINKING?.trim().toLowerCase();
+const FAST_MODEL_THINKING = fastThinkingRaw === "enabled" || fastThinkingRaw === "disabled" ? fastThinkingRaw : undefined;
+
+/**
+ * Apply the deployment's thinking policy only to calls routed to the fast
+ * model. Unset deliberately preserves the task's existing preference.
+ * `enabled` means letting the endpoint use its default thinking mode, so the
+ * request must omit the provider-specific `thinking` field.
+ */
+function fastModelOpts(o: ChatOpts): { opts: ChatOpts; sendOpenAIDisabled: boolean } {
+  if (o.tier !== "fast" || !FAST_MODEL_THINKING) {
+    return { opts: o, sendOpenAIDisabled: false };
+  }
+  if (FAST_MODEL_THINKING === "disabled") {
+    return { opts: { ...o, thinking: false }, sendOpenAIDisabled: true };
+  }
+  const opts = { ...o };
+  delete opts.thinking;
+  return { opts, sendOpenAIDisabled: false };
+}
 
 let _anthropic: Anthropic | null = null;
 let _openai: OpenAI | null = null;
@@ -100,15 +119,16 @@ function openai(): OpenAI {
 
 /** One-shot call; returns the assistant's text. */
 export async function chatText(o: ChatOpts): Promise<string> {
+  const configured = fastModelOpts(o);
   if (PROVIDER === "openai") {
     const res = await openai().chat.completions.create(
-      openaiArgs(o, SMART_MODEL, OPENAI_TOKEN_PARAM, OPENAI_DISABLE_THINKING) as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+      openaiArgs(configured.opts, SMART_MODEL, OPENAI_TOKEN_PARAM, configured.sendOpenAIDisabled) as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
     );
     const choice = res.choices[0];
     if (choice?.message?.refusal) throw new LLMError("The model declined this request.", 422);
     return choice?.message?.content ?? "";
   }
-  const res = await anthropic().messages.create(anthropicArgs(o, SMART_MODEL));
+  const res = await anthropic().messages.create(anthropicArgs(configured.opts, SMART_MODEL));
   if (res.stop_reason === "refusal") throw new LLMError("The model declined this request.", 422);
   return res.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -120,10 +140,11 @@ export async function chatText(o: ChatOpts): Promise<string> {
 export function chatStream(o: ChatOpts): TextRun {
   let acc = "";
   let refusal = false;
+  const configured = fastModelOpts(o);
   async function* run() {
     if (PROVIDER === "openai") {
       const stream = await openai().chat.completions.create({
-        ...openaiArgs(o, SMART_MODEL, OPENAI_TOKEN_PARAM, OPENAI_DISABLE_THINKING),
+        ...openaiArgs(configured.opts, SMART_MODEL, OPENAI_TOKEN_PARAM, configured.sendOpenAIDisabled),
         stream: true,
       } as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming);
       for await (const chunk of stream) {
@@ -138,7 +159,7 @@ export function chatStream(o: ChatOpts): TextRun {
       }
       return;
     }
-    const stream = anthropic().messages.stream(anthropicArgs(o, SMART_MODEL));
+    const stream = anthropic().messages.stream(anthropicArgs(configured.opts, SMART_MODEL));
     for await (const ev of stream) {
       if (ev.type === "content_block_delta" && ev.delta.type === "text_delta" && ev.delta.text) {
         acc += ev.delta.text;

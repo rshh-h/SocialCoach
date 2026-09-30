@@ -53,6 +53,7 @@ export async function runRoleplay(input: TurnInput, llm: LLM, fastModel: string,
         : ` The learner has gone silent again, ${last?.seconds ?? 0} seconds this time (silence #${streak} in a row). The character gives up on this conversation now: a believable exit line, "ended": true, this practice limit is not evidence of poor communication; original goal attainment and skill are separate.`;
   const run = llm.chatStream({
     model: fastModel,
+    tier: "fast",
     maxTokens: 1800,
     thinking: false,
     system: [

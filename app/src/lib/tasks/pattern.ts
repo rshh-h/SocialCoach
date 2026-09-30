@@ -48,6 +48,7 @@ export async function runPattern(input: PatternInput, llm: LLM, smartModel: stri
   const raw = await jsonCall<PatternResult>(
     {
       model: smartModel,
+      tier: "smart",
       thinking: false,
       maxTokens: 2000,
       system: patternSystem(lang),

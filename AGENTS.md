@@ -38,6 +38,10 @@ SocialCoach —— LLM 社交技能教练。应用在 `app/`（Next.js），仓�
 python3 ~/.claude/skills/project-wiki/scripts/wiki_audit.py wiki/
 ```
 
+## Git
+
+- 没有特殊要求时，提交默认推送到 `rshh` remote；只有用户明确指定时才推送其他 remote。
+
 ## 项目专有约束
 
 这些约束违反了就是产品定位问题，不是代码风格问题：

@@ -20,6 +20,8 @@ export interface SystemPart {
 
 export interface ChatOpts {
   model?: string;
+  /** Routing intent; distinct from model id because fast and smart may use the same model. */
+  tier?: "fast" | "smart";
   system: string | SystemPart[];
   messages: { role: "user" | "assistant"; content: string }[];
   maxTokens: number;
@@ -82,7 +84,7 @@ export function openaiArgs(o: ChatOpts, fallbackModel: string, tokenParam: Token
     // so a short budget can come back empty. Endpoints differ on how to turn it
     // off — GLM takes `thinking`, official OpenAI rejects the field outright —
     // hence the opt-in.
-    ...(disableThinking && o.thinking === false ? { thinking: { type: "disabled" as const } } : {}),
+    ...(disableThinking ? { thinking: { type: "disabled" as const } } : {}),
     messages: [
       { role: "system" as const, content: systemParts(o.system).map((p) => p.text).join("\n\n") },
       ...o.messages.map((m) => ({ role: m.role, content: m.content })),
